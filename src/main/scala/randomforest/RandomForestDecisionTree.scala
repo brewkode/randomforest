@@ -12,7 +12,9 @@ import scala.collection.immutable
   4. Identify feature that min loss. i.e., iG or  gini coeff
   5. Goto step 3 until max depth
  */
-case class LabelledData(label: String, featureVector: Array[Double])
+case class LabelledData(label: String, featureVector: Array[Double]){
+  def tsv() = label+"\t"+featureVector.mkString("\t")
+}
 case class Split(left:IndexedSeq[LabelledData],right:IndexedSeq[LabelledData],informationGain:Double,threshold:Double,featureIndex:Int)
 case class Prediction(probabilities: Map[String, Double]) {
   def probabilityFor(label: String) = probabilities(label)

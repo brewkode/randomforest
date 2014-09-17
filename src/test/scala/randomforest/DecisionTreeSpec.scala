@@ -1,12 +1,11 @@
 package randomforest
 
 import org.scalatest.FlatSpec
-import org.scalatest.matchers.ShouldMatchers
+import org.scalatest.matchers.ShouldMatchers._
 import org.mockito.Mockito._
-import scala.collection.mutable
 
 
-class DecisionTreeSpec extends FlatSpec with ShouldMatchers {
+class DecisionTreeSpec extends FlatSpec {
   val mockChoice = mock(classOf[RandomChoice])
   trait MockRandom extends Random{
     override lazy val choice = mockChoice
@@ -40,7 +39,7 @@ class DecisionTreeSpec extends FlatSpec with ShouldMatchers {
     bootstrap.sampleFeatures(3)(4) should be(List(2,3,1))
   }
 
-  "DecisionTree" should "make decisions" in {
+  "DecisionTree" should "make correct predictions when doing tr" in {
     val data = Array(
       LabelledData("label1", Array[Double](0.3, 0.1, 0.1, 0.1)),
       LabelledData("label1", Array[Double](0.1, 0.1, 0.1, 0.1)),
