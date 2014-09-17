@@ -14,32 +14,37 @@ import scala.collection.immutable
  */
 case class LabelledData(label: String, featureVector: Array[Double])
 case class Split(left:IndexedSeq[LabelledData],right:IndexedSeq[LabelledData],informationGain:Double,threshold:Double,featureIndex:Int)
+case class Prediction(probabilities: Map[String, Double]) {
+  def probabilityFor(label: String) = probabilities(label)
+  def predictedLabel = probabilities.maxBy(_._2)._1
+}
+
 trait Node {
-  def predict(featureVector:Array[Double]):Map[String,Double]
+  def predict(featureVector:Array[Double]):Prediction
 }
 case class LeafNode(labelProbablities:Map[String,Double]) extends Node {
-  def predict(featureVector:Array[Double]) = labelProbablities
+  def predict(featureVector:Array[Double]) = Prediction(labelProbablities)
 }
-case class SplitNode(left:Node,right:Node,split:Split) extends Node {
+case class SplitNode(left:Node,right:Node, featureIndex: Int, threshold: Double) extends Node {
   def predict(featureVector:Array[Double]) = {
-    if(featureVector(split.featureIndex) < split.threshold) left.predict(featureVector) else right.predict(featureVector)
+    if(featureVector(featureIndex) < threshold) left.predict(featureVector) else right.predict(featureVector)
   }
 }
 
-class DecisionTreeTrainer(maxDepth: Int, numberOfFeaturesToSample:Int, sizeOfSampleBag:Int) {
+class DecisionTreeTrainer(maxDepth: Int, numberOfFeaturesToSample:Int, sizeOfSampleBag:Int)(implicit bootstrap: Bootstrap = new Bootstrap()) {
   def train(labelledData:IndexedSeq[LabelledData]) = {
     val featureDimensions = labelledData.head.featureVector.size
-    buildTree(Bootstrap.sampleWithReplacement(math.min(labelledData.size,sizeOfSampleBag))(labelledData),math.min(maxDepth,featureDimensions))
+    buildTree(bootstrap.sampleWithReplacement(math.min(labelledData.size,sizeOfSampleBag))(labelledData),math.min(maxDepth,featureDimensions))
   }
 
   def buildTree(sampledData:IndexedSeq[LabelledData],depth:Int):Node = {
-    val sampleFeatureIndices = Bootstrap.sampleFeatures(math.min(numberOfFeaturesToSample,sampledData.head.featureVector.size))(sampledData.head.featureVector.size)
+    val sampleFeatureIndices = bootstrap.sampleFeatures(math.min(numberOfFeaturesToSample,sampledData.head.featureVector.size))(sampledData.head.featureVector.size)
     val entropyOfDataset = FrequencyHistogram.entropyInLabels(sampledData)
 
     if(depth == 0) return LeafNode(FrequencyHistogram.labelPriors(sampledData))
 
     val split = sampleFeatureIndices.map(featureIdx => {
-      val threshold = Random.nextDouble()
+      val threshold = bootstrap.guessThreshold()
       val (left, right) = sampledData.partition(_.featureVector(featureIdx) < threshold)
 
       val informationGain = entropyOfDataset - (FrequencyHistogram.entropyInLabels(left) * left.size + FrequencyHistogram.entropyInLabels(right) * right.size) / sampledData.size
@@ -47,18 +52,20 @@ class DecisionTreeTrainer(maxDepth: Int, numberOfFeaturesToSample:Int, sizeOfSam
     }).maxBy(_.informationGain)
 
     if(math.abs(split.informationGain) < 0.001) return LeafNode(FrequencyHistogram.labelPriors(sampledData))
-    SplitNode(buildTree(split.left,depth -1),buildTree(split.right,depth -1),split)
+    SplitNode(buildTree(split.left,depth -1),buildTree(split.right,depth -1), split.featureIndex, split.threshold)
   }
 }
 
-object Bootstrap {
-  def sampleWithReplacement(sampleSize:Int)(data:IndexedSeq[LabelledData]) = {
-    1.to(sampleSize).map(e => Random.nextInt(data.size-1)).map(data)
+class Bootstrap extends Random {
+  def sampleWithReplacement(sampleSize:Int)(data:IndexedSeq[LabelledData]): IndexedSeq[LabelledData] = {
+    1.to(sampleSize).map(e => choice.nextInt(data.size-1)).map(data)
   }
 
   def sampleFeatures(sampleSize:Int)(noOfFeatures:Int) = {
-   Random.shuffle(0.to(noOfFeatures-1).toList).take(sampleSize)
+    choice.shuffle(0.to(noOfFeatures-1).toList).take(sampleSize)
   }
+
+  def guessThreshold() = choice.nextDouble
 }
 
 object FrequencyHistogram {
