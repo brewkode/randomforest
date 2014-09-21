@@ -6,6 +6,7 @@ trait Random {
   lazy val choice = new RandomChoice
 }
 
+
 class RandomChoice {
   def nextDouble() = Random.nextDouble()
   def nextInt() = Random.nextInt()
